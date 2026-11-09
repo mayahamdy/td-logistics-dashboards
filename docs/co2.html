@@ -13,6 +13,7 @@
   .kpi .value { font-size: 1.5rem; font-weight: bold; color: #2e8b46; }
   .kpi .label { font-size: 0.8rem; color: #666; }
   #assumptions { font-size: 0.8rem; color: #666; padding: 0.6rem 0.9rem; border-left: 3px solid #2e8b46; margin: 1rem 0; }
+  #routeShareArgument { font-size: 0.9rem; color: #555; }
   canvas { margin-top: 1.5rem; }
 </style>
 </head>
@@ -21,6 +22,7 @@
   <h1>Which routes should we prioritize to cut network CO2?</h1>
   <p>For: sustainability/CSR manager. Decision this supports: which specific delivery routes are the best candidates for consolidation or a shift to rail, and which warehouse is the least CO2-efficient per tonne delivered.</p>
   <div class="kpis" id="kpis">Loading...</div>
+  <p id="routeShareArgument"></p>
   <div id="assumptions"></div>
 
   <h2>Highest-CO2 routes (ranking → bar chart)</h2>
@@ -35,15 +37,24 @@
 fetch('data/co2.json')
   .then(r => r.json())
   .then(data => {
+    const top = data.top_links || [];
+    const topRoute = top[0];
+    const topRouteShare = topRoute && data.total_co2_kg
+      ? `${(topRoute.co2_kg / data.total_co2_kg * 100).toFixed(1)}%`
+      : '—';
+    const topRouteLabel = topRoute ? `${topRoute.city} <- ${topRoute.warehouse}` : 'No route data';
+
     document.getElementById('kpis').innerHTML = `
       <div class="kpi"><div class="value">${(data.total_co2_kg / 1000).toFixed(0)} t</div><div class="label">Total network CO2 / year</div></div>
       <div class="kpi"><div class="value">${data.co2_kg_per_tonne_network_avg}</div><div class="label">kg CO2 per tonne delivered (network avg)</div></div>
+      <div class="kpi"><div class="value">${topRouteShare}</div><div class="label">Share from top route (${topRouteLabel})</div></div>
     `;
+    document.getElementById('routeShareArgument').textContent =
+      'The top route’s share of network emissions shows whether one route is a concentrated reduction opportunity; unlike the total and average, it helps prioritize a single route.';
     document.getElementById('assumptions').innerHTML =
       `Assumptions: ${data.assumptions.co2_factor_kg_per_tonne_km} kg CO2e/tonne-km (illustrative, within the commonly-cited range for road freight — verify against ADEME's current Base Empreinte figure), ` +
       `demand estimated at ${data.assumptions.tonnes_per_1000_residents_per_year} tonnes/year per 1,000 residents (a proxy, not measured shipment data).`;
 
-    const top = data.top_links || [];
     new Chart(document.getElementById('topLinksChart'), {
       type: 'bar',
       data: { labels: top.map(l => `${l.city} <- ${l.warehouse}`), datasets: [{ label: 'CO2 (kg/year)', data: top.map(l => l.co2_kg), backgroundColor: '#2e8b46' }] },
